@@ -1,0 +1,6 @@
+{
+  "name": "NetBlock",
+  "description": "A local rootless firewall application using VpnService to block selected internet traffic.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
