@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.BlockedAppEntity
-import com.example.data.local.StatisticsEntity
+
 import com.example.data.repository.BlockedAppRepository
 import com.example.domain.model.AppInfo
 import com.example.service.vpn.NetBlockVpnService
@@ -23,7 +23,6 @@ sealed class Screen {
     object VpnPermission : Screen()
     object Home : Screen()
     object AppDetails : Screen()
-    object Statistics : Screen()
     object FilterSort : Screen()
     object Settings : Screen()
 }
@@ -116,23 +115,18 @@ class NetBlockViewModel(private val repository: BlockedAppRepository) : ViewMode
         sorted
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Live telemetry calculations from Statistics DB
-    val liveStatistics: StateFlow<List<StatisticsEntity>> = repository.allStatisticsFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     val totalBlockedCount = repository.allBlockedAppsFlow.map { list ->
         list.size
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    init {
-        // Hydrate mock data on first start to look stunning in stats and dashboard
-        viewModelScope.launch {
-            checkAndSeedMockStats()
-        }
-    }
-
     fun navigateTo(screen: Screen) {
         _activeScreen.value = screen
+    }
+
+    fun completeOnboarding(context: Context) {
+        val prefs = context.getSharedPreferences("netblock_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("has_completed_onboarding", true).apply()
+        navigateTo(Screen.Home)
     }
 
     fun setSearchQuery(query: String) {
@@ -274,43 +268,6 @@ class NetBlockViewModel(private val repository: BlockedAppRepository) : ViewMode
         }
     }
 
-    private suspend fun checkAndSeedMockStats() {
-        val currentStats = repository.getBlockedAppsList() // Check database population
-        val statsList = repository.allStatisticsFlow.first()
-        if (statsList.isEmpty()) {
-            val calendar = Calendar.getInstance()
-            val df = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            
-            // Seed 7 days back of gorgeous charts data!
-            val apps = listOf(
-                Pair("com.instagram.android", "Instagram"),
-                Pair("com.google.android.youtube", "YouTube"),
-                Pair("com.facebook.katana", "Facebook"),
-                Pair("com.spotify.music", "Spotify")
-            )
-
-            for (i in 6 downTo 0) {
-                calendar.time = Date()
-                calendar.add(Calendar.DAY_OF_YEAR, -i)
-                val dateStr = df.format(calendar.time)
-
-                // Pick a few apps to simulate block activity
-                apps.forEach { app ->
-                    val requests = (150..500).random()
-                    val dataSaved = requests.toLong() * (1024 * 50).toLong() // 50KB/req approx
-                    
-                    val stat = StatisticsEntity(
-                        dateString = dateStr,
-                        packageName = app.first,
-                        appName = app.second,
-                        blockedRequests = requests,
-                        dataSavedBytes = dataSaved
-                    )
-                    repository.addBlockedStatistics(stat)
-                }
-            }
-        }
-    }
 }
 
 class NetBlockViewModelFactory(private val repository: BlockedAppRepository) : ViewModelProvider.Factory {

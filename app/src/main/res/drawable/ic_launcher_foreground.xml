@@ -5,47 +5,132 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    
-    <!-- Outer Premium Glowing Shield Outline -->
-    <path
-        android:pathData="M 54,23 L 25,32 L 25,58 C 25,78 37,93 54,97 C 71,93 83,78 83,58 L 83,32 Z"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round">
-        <aapt:attr name="android:strokeColor">
-            <gradient
-                android:type="linear"
-                android:startX="25"
-                android:startY="32"
-                android:endX="83"
-                android:endY="97">
-                <item android:offset="0.0" android:color="#00FFA3" />
-                <item android:offset="1.0" android:color="#00B2FF" />
-            </gradient>
-        </aapt:attr>
-    </path>
 
-    <!-- Inner Protective Shield Vector with Blue/Violet Color Gradient -->
+    <!-- 1. Soft Outer Light-Blue/Cyan Shield Glow -->
     <path
-        android:fillType="nonZero">
+        android:pathData="M 54, 23 L 27, 32 L 27, 54 C 27, 72 39, 82 54, 85 C 69, 82 81, 72 81, 54 L 81, 32 Z"
+        android:fillColor="#3364B5F6" />
+
+    <!-- 2. Premium Outer Rim Border of the Shield -->
+    <path
+        android:pathData="M 54, 25 L 29, 33 L 29, 54 C 29, 71 41, 80 54, 83 C 67, 80 79, 71 79, 54 L 79, 33 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#B3E5FC"
+        android:fillColor="#00000000" />
+
+    <!-- 3. Main Shield Shape with Rich Blue Gradient fill -->
+    <path
+        android:pathData="M 54, 26 L 30, 34 L 30, 54 C 30, 70 41, 79 54, 82 C 67, 79 78, 70 78, 54 L 78, 34 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="28"
+                android:startX="30"
                 android:startY="34"
-                android:endX="80"
-                android:endY="94">
-                <item android:offset="0.0" android:color="#00C2FF" />
-                <item android:offset="1.0" android:color="#7000FF" />
+                android:endX="78"
+                android:endY="82">
+                <item android:offset="0.0" android:color="#2196F3" />
+                <item android:offset="0.5" android:color="#1E88E5" />
+                <item android:offset="1.0" android:color="#0D47A1" />
             </gradient>
         </aapt:attr>
-        <pathData>
-            M 54,26 L 28,34 L 28,58 C 28,76 39,90 54,94 C 69,90 80,76 80,58 L 80,34 Z
-        </pathData>
     </path>
 
-    <!-- Sleek High-Contrast White Security Padlock with circuit styling -->
+    <!-- 4. Globe Line-Art Details -->
+    <!-- Outer Circle -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M 54,39 C 50,39 46.5,42 46.5,47 L 46.5,54 L 61.5,54 L 61.5,47 C 61.5,42 58,39 54,39 Z M 42,54 C 40.9,54 40,54.9 40,56 L 40,72 C 40,73.1 40.9,74 42,74 L 66,74 C 67.1,74 68,73.1 68,72 L 68,56 C 68,54.9 67.1,54 66,54 Z M 54,61 C 55.4,61 56.5,62.1 56.5,63.5 C 56.5,64.4 56,65.2 55.2,65.7 L 56.5,70.5 L 51.5,70.5 L 52.8,65.7 C 52,65.2 51.5,64.4 51.5,63.5 C 51.5,62.1 52.6,61 54,61 Z" />
+        android:pathData="M 54, 41 A 13,13 0 1 1 54, 67 A 13,13 0 1 1 54, 41"
+        android:strokeWidth="1.2"
+        android:strokeColor="#80FFFFFF"
+        android:fillColor="#00000000" />
+    <!-- Vertical Center Line -->
+    <path
+        android:pathData="M 54, 41 L 54, 67"
+        android:strokeWidth="1.0"
+        android:strokeColor="#80FFFFFF" />
+    <!-- Horizontal Center Line -->
+    <path
+        android:pathData="M 41, 54 L 67, 54"
+        android:strokeWidth="1.0"
+        android:strokeColor="#80FFFFFF" />
+    <!-- Left Longitude Line -->
+    <path
+        android:pathData="M 54, 41 C 47, 49 47, 59 54, 67"
+        android:strokeWidth="1.0"
+        android:strokeColor="#80FFFFFF"
+        android:fillColor="#00000000" />
+    <!-- Right Longitude Line -->
+    <path
+        android:pathData="M 54, 41 C 61, 49 61, 59 54, 67"
+        android:strokeWidth="1.0"
+        android:strokeColor="#80FFFFFF"
+        android:fillColor="#00000000" />
+    <!-- Top Latitude Line -->
+    <path
+        android:pathData="M 44.5, 48 C 48, 51 60, 51 63.5, 48"
+        android:strokeWidth="1.0"
+        android:strokeColor="#80FFFFFF"
+        android:fillColor="#00000000" />
+    <!-- Bottom Latitude Line -->
+    <path
+        android:pathData="M 44.5, 60 C 48, 57 60, 57 63.5, 60"
+        android:strokeWidth="1.0"
+        android:strokeColor="#80FFFFFF"
+        android:fillColor="#00000000" />
+
+    <!-- 5. Padlock Shackle (Arch) -->
+    <path
+        android:pathData="M 51, 53 L 51, 48.5 C 51, 46.8 52.3, 45.5 54, 45.5 C 55.7, 45.5 57, 46.8 57, 48.5 L 57, 53"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 6. Padlock Solid Body -->
+    <path
+        android:pathData="M 48.5, 53 C 47.7, 53 47, 53.7 47, 54.5 L 47, 62.5 C 47, 63.3 47.7, 64 48.5, 64 L 59.5, 64 C 60.3, 64 61, 63.3 61, 62.5 L 61, 54.5 C 61, 53.7 60.3, 53 59.5, 53 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- 7. Keyhole detail inside Padlock body -->
+    <path
+        android:pathData="M 54, 56.5 A 0.9,0.9 0 1 0 54, 58.3 L 54.8, 61 L 53.2, 61 Z"
+        android:fillColor="#1565C0" />
+
+    <!-- 8. Overlay Bottom-Right Frosted Circle Badge -->
+    <!-- Badge Background -->
+    <path
+        android:pathData="M 72, 62 A 10,10 0 1 1 72, 82 A 10,10 0 1 1 72, 62"
+        android:fillColor="#EDF4FF" />
+    <!-- Badge White border -->
+    <path
+        android:pathData="M 72, 62 A 10,10 0 1 1 72, 82 A 10,10 0 1 1 72, 62"
+        android:strokeWidth="1.0"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000" />
+
+    <!-- 9. Slashed Wi-Fi Icon inside Circular Badge -->
+    <!-- Wi-Fi Dot -->
+    <path
+        android:pathData="M 72, 75.8 A 0.8,0.8 0 1 1 72, 77.4 A 0.8,0.8 0 1 1 72, 75.8 Z"
+        android:fillColor="#004BFF" />
+    <!-- Wi-Fi Wave 1 (medium) -->
+    <path
+        android:pathData="M 68.5, 74 C 69.5, 72.8 74.5, 72.8 75.5, 74"
+        android:strokeWidth="1.0"
+        android:strokeLineCap="round"
+        android:strokeColor="#004BFF"
+        android:fillColor="#00000000" />
+    <!-- Wi-Fi Wave 2 (outer) -->
+    <path
+        android:pathData="M 65.5, 71 C 67.5, 69.2 76.5, 69.2 78.5, 71"
+        android:strokeWidth="1.0"
+        android:strokeLineCap="round"
+        android:strokeColor="#004BFF"
+        android:fillColor="#00000000" />
+    <!-- Slash Line -->
+    <path
+        android:pathData="M 65.5, 69 L 78.5, 79"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:strokeColor="#004BFF" />
+
 </vector>

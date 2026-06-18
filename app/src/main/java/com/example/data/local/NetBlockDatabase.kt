@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [BlockedAppEntity::class, FirewallRuleEntity::class, StatisticsEntity::class],
+    entities = [BlockedAppEntity::class, FirewallRuleEntity::class],
     version = 1,
     exportSchema = false
 )

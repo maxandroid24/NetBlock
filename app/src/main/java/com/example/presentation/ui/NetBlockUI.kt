@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.R
-import com.example.data.local.StatisticsEntity
 import com.example.domain.model.AppInfo
 import com.example.presentation.viewmodel.*
 import com.example.ui.theme.*
@@ -152,7 +151,6 @@ fun NetBlockMainScreen(viewModel: NetBlockViewModel) {
                     is Screen.VpnPermission -> VpnPermissionScreen(viewModel)
                     is Screen.Home -> HomeDashboard(viewModel)
                     is Screen.AppDetails -> AppDetailsScreen(viewModel)
-                    is Screen.Statistics -> StatisticsScreen(viewModel)
                     is Screen.FilterSort -> FilterSortScreen(viewModel)
                     is Screen.Settings -> SettingsScreen(viewModel)
                 }
@@ -353,13 +351,14 @@ fun VpnPermissionScreen(viewModel: NetBlockViewModel) {
             .fillMaxSize()
             .statusBarsPadding()
             .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 24.dp)
+            modifier = Modifier.padding(top = 16.dp)
         ) {
             Text(
                 text = "Protect Your Apps",
@@ -367,12 +366,12 @@ fun VpnPermissionScreen(viewModel: NetBlockViewModel) {
                 color = MaterialTheme.colorScheme.onBackground
             )
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Graphical network nodes VPN visualization
             Box(
                 modifier = Modifier
-                    .size(200.dp)
+                    .size(180.dp)
                     .drawBehind {
                         // Drawing connecting lines to signify Secure VPN nodes
                         val center = Offset(size.width / 2f, size.height / 2f)
@@ -426,7 +425,7 @@ fun VpnPermissionScreen(viewModel: NetBlockViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = "NetBlock creates a local VPN connection to monitor and block internet traffic for selected applications. No data ever leaves your device.",
@@ -460,7 +459,7 @@ fun VpnPermissionScreen(viewModel: NetBlockViewModel) {
                 onClick = {
                     // Start Master Switch / VPN and navigate
                     vpnToggler(true)
-                    viewModel.navigateTo(Screen.Home)
+                    viewModel.completeOnboarding(context)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                 shape = RoundedCornerShape(28.dp),
@@ -477,7 +476,7 @@ fun VpnPermissionScreen(viewModel: NetBlockViewModel) {
             }
 
             TextButton(
-                onClick = { viewModel.navigateTo(Screen.Home) },
+                onClick = { viewModel.completeOnboarding(context) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
@@ -527,15 +526,11 @@ fun HomeDashboard(viewModel: NetBlockViewModel) {
     val currentFilter by viewModel.selectedFilter.collectAsState()
     val appsList by viewModel.appsList.collectAsState()
     val totalBlockedAmt by viewModel.totalBlockedCount.collectAsState()
-    val liveStats by viewModel.liveStatistics.collectAsState()
 
-    var currentHomeTab by remember { mutableStateOf(0) } // 0: Firewall Applist, 1: Stats Screen, 2: Settings
+    var currentHomeTab by remember { mutableStateOf(0) } // 0: Firewall Applist, 1: Settings
 
     // Calculate aggregated telemetry
     val totalBlockedCountDb = totalBlockedAmt
-    val dataSavedBytes = liveStats.sumOf { it.dataSavedBytes }
-    val dataSavedMB = String.format(Locale.getDefault(), "%.1f", dataSavedBytes.toDouble() / (1024.0 * 1024.0))
-    val blockedRequestsCount = liveStats.sumOf { it.blockedRequests }
 
     LaunchedEffect(Unit) {
         viewModel.syncVpnStatus()
@@ -567,18 +562,6 @@ fun HomeDashboard(viewModel: NetBlockViewModel) {
                 NavigationBarItem(
                     selected = (currentHomeTab == 1),
                     onClick = { currentHomeTab = 1 },
-                    icon = { Icon(Icons.Default.BarChart, contentDescription = "Statistics") },
-                    label = { Text("Statistics", fontWeight = FontWeight.Bold) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = PrimaryBlue,
-                        selectedTextColor = PrimaryBlue,
-                        indicatorColor = PrimaryBlue.copy(alpha = 0.12f)
-                    )
-                )
-
-                NavigationBarItem(
-                    selected = (currentHomeTab == 2),
-                    onClick = { currentHomeTab = 2 },
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                     label = { Text("Settings", fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
@@ -713,18 +696,18 @@ fun HomeDashboard(viewModel: NetBlockViewModel) {
                                                 StatusCardStatBlock(
                                                     flex = 1f,
                                                     value = "$totalBlockedCountDb",
-                                                    label = "Blocked",
+                                                    label = "Blocked Apps",
                                                     isVpnActive = isVpnActive
                                                 )
                                                 StatusCardStatBlock(
-                                                    flex = 1.2f,
-                                                    value = "$dataSavedMB",
-                                                    label = "Saved",
+                                                    flex = 0.0f,
+                                                    value = "",
+                                                    label = "Saved-to-delete",
                                                     isVpnActive = isVpnActive
                                                 )
                                                 StatusCardStatBlock(
-                                                    flex = 1.1f,
-                                                    value = "$blockedRequestsCount",
+                                                    flex = 0.0f,
+                                                    value = "",
                                                     label = "Requests",
                                                     isVpnActive = isVpnActive
                                                 )
@@ -869,7 +852,7 @@ fun HomeDashboard(viewModel: NetBlockViewModel) {
                                         }
 
                                         IconButton(
-                                            onClick = { currentHomeTab = 2 },
+                                            onClick = { currentHomeTab = 1 },
                                             modifier = Modifier
                                                 .clip(CircleShape)
                                                 .background(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
@@ -960,19 +943,7 @@ fun HomeDashboard(viewModel: NetBlockViewModel) {
                                                 StatusCardStatBlock(
                                                     flex = 1f,
                                                     value = "$totalBlockedCountDb",
-                                                    label = "Blocked",
-                                                    isVpnActive = isVpnActive
-                                                )
-                                                StatusCardStatBlock(
-                                                    flex = 1.2f,
-                                                    value = "$dataSavedMB",
-                                                    label = "Saved",
-                                                    isVpnActive = isVpnActive
-                                                )
-                                                StatusCardStatBlock(
-                                                    flex = 1.1f,
-                                                    value = "$blockedRequestsCount",
-                                                    label = "Requests",
+                                                    label = "Blocked Apps",
                                                     isVpnActive = isVpnActive
                                                 )
                                             }
@@ -1086,10 +1057,6 @@ fun HomeDashboard(viewModel: NetBlockViewModel) {
                     }
                 }
                 1 -> {
-                    // STATISTICS VISUALS
-                    StatisticsScreen(viewModel)
-                }
-                2 -> {
                     // SETTINGS PAGE
                     SettingsScreen(viewModel)
                 }
@@ -1151,42 +1118,44 @@ fun RowScope.StatusCardStatBlock(
     label: String,
     isVpnActive: Boolean
 ) {
-    val bg = if (isVpnActive) {
-        Color.White.copy(alpha = 0.15f)
-    } else {
-        if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f)
-    }
-    val borderColor = if (isVpnActive) {
-        Color.White.copy(alpha = 0.25f)
-    } else {
-        if (isSystemInDarkTheme()) BorderDark else BorderLight
-    }
-    val valueColor = if (isVpnActive) Color.White else MaterialTheme.colorScheme.onBackground
-    val labelColor = if (isVpnActive) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+    if (flex > 0.01f) {
+        val bg = if (isVpnActive) {
+            Color.White.copy(alpha = 0.15f)
+        } else {
+            if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f)
+        }
+        val borderColor = if (isVpnActive) {
+            Color.White.copy(alpha = 0.25f)
+        } else {
+            if (isSystemInDarkTheme()) BorderDark else BorderLight
+        }
+        val valueColor = if (isVpnActive) Color.White else MaterialTheme.colorScheme.onBackground
+        val labelColor = if (isVpnActive) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
 
-    Column(
-        modifier = Modifier
-            .weight(flex)
-            .clip(RoundedCornerShape(16.dp))
-            .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
-            .padding(12.dp)
-    ) {
-        Text(
-            text = label.uppercase(Locale.getDefault()),
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 9.sp,
-                letterSpacing = 0.5.sp
-            ),
-            color = labelColor
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-            color = valueColor
-        )
+        Column(
+            modifier = Modifier
+                .weight(flex)
+                .clip(RoundedCornerShape(16.dp))
+                .background(bg)
+                .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                .padding(12.dp)
+        ) {
+            Text(
+                text = label.uppercase(Locale.getDefault()),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 9.sp,
+                    letterSpacing = 0.5.sp
+                ),
+                color = labelColor
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                color = valueColor
+            )
+        }
     }
 }
 
@@ -1580,6 +1549,7 @@ fun AppStatMetricRow(label: String, value: String) {
     }
 }
 
+/*
 // ==========================================
 // 5. SCREEN 6: STATISTICS TAB
 // ==========================================
@@ -1910,6 +1880,7 @@ fun AnimatedBarChart(stats: List<StatisticsEntity>) {
     }
 }
 
+*/
 // ==========================================
 // 6. SCREEN 7: SORT & FILTER PAGE
 // ==========================================

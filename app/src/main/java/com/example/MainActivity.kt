@@ -26,6 +26,12 @@ class MainActivity : ComponentActivity() {
             NetBlockViewModelFactory(repository)
         )[NetBlockViewModel::class.java]
 
+        val prefs = getSharedPreferences("netblock_prefs", android.content.Context.MODE_PRIVATE)
+        val hasCompletedOnboarding = prefs.getBoolean("has_completed_onboarding", false)
+        if (hasCompletedOnboarding) {
+            viewModel.navigateTo(com.example.presentation.viewmodel.Screen.Home)
+        }
+
         enableEdgeToEdge()
         
         setContent {

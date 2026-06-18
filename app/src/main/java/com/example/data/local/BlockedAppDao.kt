@@ -41,16 +41,4 @@ interface BlockedAppDao {
     @Query("DELETE FROM firewall_rules")
     suspend fun clearAllFirewallRules()
 
-    // --- Statistics Queries ---
-    @Query("SELECT * FROM statistics ORDER BY timestamp DESC")
-    fun getAllStatisticsFlow(): Flow<List<StatisticsEntity>>
-
-    @Query("SELECT * FROM statistics")
-    suspend fun getStatisticsList(): List<StatisticsEntity>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertStatistics(stat: StatisticsEntity)
-
-    @Query("DELETE FROM statistics")
-    suspend fun clearAllStatistics()
 }

@@ -6,7 +6,7 @@ import android.content.pm.PackageManager
 import com.example.data.local.BlockedAppDao
 import com.example.data.local.BlockedAppEntity
 import com.example.data.local.FirewallRuleEntity
-import com.example.data.local.StatisticsEntity
+
 import com.example.domain.model.AppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -18,7 +18,6 @@ class BlockedAppRepository(private val dao: BlockedAppDao) {
     // Streams from Database
     val allBlockedAppsFlow: Flow<List<BlockedAppEntity>> = dao.getAllBlockedAppsFlow()
     val allFirewallRulesFlow: Flow<List<FirewallRuleEntity>> = dao.getAllFirewallRulesFlow()
-    val allStatisticsFlow: Flow<List<StatisticsEntity>> = dao.getAllStatisticsFlow()
 
     suspend fun getBlockedAppsList(): List<BlockedAppEntity> {
         return dao.getBlockedAppsList()
@@ -51,17 +50,9 @@ class BlockedAppRepository(private val dao: BlockedAppDao) {
         dao.deleteFirewallRulesByPackage(packageName)
     }
 
-    suspend fun addBlockedStatistics(stat: StatisticsEntity) {
-        dao.insertStatistics(stat)
-    }
-
     suspend fun clearAllBlockedApps() {
         dao.clearAllBlockedApps()
         dao.clearAllFirewallRules()
-    }
-
-    suspend fun clearAllStatistics() {
-        dao.clearAllStatistics()
     }
 
     /**

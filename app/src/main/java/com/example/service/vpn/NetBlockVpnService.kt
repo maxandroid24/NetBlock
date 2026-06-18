@@ -17,7 +17,6 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.data.local.NetBlockDatabase
-import com.example.data.local.StatisticsEntity
 import com.example.data.repository.BlockedAppRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -197,19 +196,8 @@ class NetBlockVpnService : VpnService() {
                     val size = input.read(buffer)
                     if (size <= 0) break
 
-                    // Direct packets intercepted represent blocked requests. Keep record!
-                    val selectedApp = randomApps.randomOrNull() ?: continue
-                    serviceScope.launch {
-                        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                        val stat = StatisticsEntity(
-                            dateString = todayStr,
-                            packageName = selectedApp.packageName,
-                            appName = selectedApp.appName,
-                            blockedRequests = 1,
-                            dataSavedBytes = size.toLong()
-                        )
-                        repository.addBlockedStatistics(stat)
-                    }
+                    // Packets are intercepted and consumed. No statistics are kept.
+                    if (randomApps.isEmpty()) continue
                 }
             } catch (e: Exception) {
                 // Interface closed, expected
