@@ -56,6 +56,18 @@ import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.cos
 import kotlin.math.sin
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.VpnService
+import android.app.Activity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+
+val LocalVpnToggler = staticCompositionLocalOf<(Boolean) -> Unit> {
+    { _ -> }
+}
 
 /**
  * Main application navigation router and overlay container.
@@ -69,56 +81,81 @@ fun NetBlockMainScreen(viewModel: NetBlockViewModel) {
     val totalBlocked by viewModel.totalBlockedCount.collectAsState()
     val isRefreshing by viewModel.isRefreshingApps.collectAsState()
 
+    val vpnLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.setMasterToggleState(context, true)
+        } else {
+            Toast.makeText(context, "VPN Permission is required to block app connections.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val toggleVpn: (Boolean) -> Unit = { active ->
+        if (active) {
+            val prepareIntent = VpnService.prepare(context)
+            if (prepareIntent != null) {
+                vpnLauncher.launch(prepareIntent)
+            } else {
+                viewModel.setMasterToggleState(context, true)
+            }
+        } else {
+            viewModel.setMasterToggleState(context, false)
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.loadApps(context)
     }
 
-    // Main background structure
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .drawBehind {
-                // Liquid glowing gradient background accents for premium atmosphere
-                val canvasWidth = size.width
-                val canvasHeight = size.height
+    CompositionLocalProvider(LocalVpnToggler provides toggleVpn) {
+        // Main background structure
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .drawBehind {
+                    // Liquid glowing gradient background accents for premium atmosphere
+                    val canvasWidth = size.width
+                    val canvasHeight = size.height
 
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(PrimaryBlue.copy(alpha = 0.15f), Color.Transparent),
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(PrimaryBlue.copy(alpha = 0.15f), Color.Transparent),
+                            center = Offset(canvasWidth * 0.2f, canvasHeight * 0.15f),
+                            radius = canvasWidth * 0.8f
+                        ),
                         center = Offset(canvasWidth * 0.2f, canvasHeight * 0.15f),
                         radius = canvasWidth * 0.8f
-                    ),
-                    center = Offset(canvasWidth * 0.2f, canvasHeight * 0.15f),
-                    radius = canvasWidth * 0.8f
-                )
+                    )
 
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(AccentLight.copy(alpha = 0.15f), Color.Transparent),
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(AccentLight.copy(alpha = 0.15f), Color.Transparent),
+                            center = Offset(canvasWidth * 0.9f, canvasHeight * 0.75f),
+                            radius = canvasWidth * 0.8f
+                        ),
                         center = Offset(canvasWidth * 0.9f, canvasHeight * 0.75f),
                         radius = canvasWidth * 0.8f
-                    ),
-                    center = Offset(canvasWidth * 0.9f, canvasHeight * 0.75f),
-                    radius = canvasWidth * 0.8f
-                )
-            }
-    ) {
-        AnimatedContent(
-            targetState = currentScreen,
-            transitionSpec = {
-                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(250))
-            },
-            label = "ScreenTransition"
-        ) { screen ->
-            when (screen) {
-                is Screen.Onboarding -> OnboardingScreen(viewModel)
-                is Screen.VpnPermission -> VpnPermissionScreen(viewModel)
-                is Screen.Home -> HomeDashboard(viewModel)
-                is Screen.AppDetails -> AppDetailsScreen(viewModel)
-                is Screen.Statistics -> StatisticsScreen(viewModel)
-                is Screen.FilterSort -> FilterSortScreen(viewModel)
-                is Screen.Settings -> SettingsScreen(viewModel)
+                    )
+                }
+        ) {
+            AnimatedContent(
+                targetState = currentScreen,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(250))
+                },
+                label = "ScreenTransition"
+            ) { screen ->
+                when (screen) {
+                    is Screen.Onboarding -> OnboardingScreen(viewModel)
+                    is Screen.VpnPermission -> VpnPermissionScreen(viewModel)
+                    is Screen.Home -> HomeDashboard(viewModel)
+                    is Screen.AppDetails -> AppDetailsScreen(viewModel)
+                    is Screen.Statistics -> StatisticsScreen(viewModel)
+                    is Screen.FilterSort -> FilterSortScreen(viewModel)
+                    is Screen.Settings -> SettingsScreen(viewModel)
+                }
             }
         }
     }
@@ -413,6 +450,8 @@ fun VpnPermissionScreen(viewModel: NetBlockViewModel) {
         }
 
         // CTA Decisions
+        val vpnToggler = LocalVpnToggler.current
+
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -420,9 +459,8 @@ fun VpnPermissionScreen(viewModel: NetBlockViewModel) {
             Button(
                 onClick = {
                     // Start Master Switch / VPN and navigate
-                    viewModel.setMasterToggleState(context, true)
+                    vpnToggler(true)
                     viewModel.navigateTo(Screen.Home)
-                    Toast.makeText(context, "Firewall activated", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                 shape = RoundedCornerShape(28.dp),
@@ -560,240 +598,481 @@ fun HomeDashboard(viewModel: NetBlockViewModel) {
             when (currentHomeTab) {
                 0 -> {
                     // FIREWALL LIST VIEW
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        // Title bar
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .padding(vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "NetBlock",
-                                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = "V3.2 PRODUCTION",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.6.sp,
-                                        fontSize = 10.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { currentHomeTab = 2 },
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val isWideScreen = maxWidth > 650.dp
+                        if (isWideScreen) {
+                            // Dual pane widescreen layout
+                            Row(
                                 modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(24.dp)
                             ) {
-                                Icon(Icons.Default.Settings, contentDescription = "Settings")
-                            }
-                        }
-
-                        // Large Liquid Glass status card
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(
-                                    if (isVpnActive) {
-                                        Brush.verticalGradient(listOf(PrimaryBlue, GradientMid, AccentLight))
-                                    } else {
-                                        SolidColor(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
+                                // Left Column: Title + PROTECTION STATUS MODULE
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    // Title bar
+                                    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                                        Text(
+                                            text = "NetBlock",
+                                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                        Text(
+                                            text = "V3.2 PRODUCTION",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 1.6.sp,
+                                                fontSize = 10.sp
+                                            ),
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                                        )
                                     }
-                                )
-                                .border(1.dp, if (isSystemInDarkTheme()) BorderDark else BorderLight, RoundedCornerShape(28.dp))
-                                .padding(20.dp)
-                        ) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
+
+                                    // Large Liquid Glass status card
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(28.dp))
+                                            .background(
+                                                if (isVpnActive) {
+                                                    Brush.verticalGradient(listOf(PrimaryBlue, GradientMid, AccentLight))
+                                                } else {
+                                                    SolidColor(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
+                                                }
+                                            )
+                                            .border(1.dp, if (isSystemInDarkTheme()) BorderDark else BorderLight, RoundedCornerShape(28.dp))
+                                            .padding(20.dp)
+                                    ) {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(52.dp)
+                                                            .clip(CircleShape)
+                                                            .background(if (isVpnActive) Color.White.copy(alpha = 0.2f) else PrimaryBlue.copy(alpha = 0.15f)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (isVpnActive) Icons.Default.Shield else Icons.Default.ShieldMoon,
+                                                            contentDescription = null,
+                                                            tint = if (isVpnActive) Color.White else PrimaryBlue,
+                                                            modifier = Modifier.size(30.dp)
+                                                        )
+                                                    }
+
+                                                    Spacer(modifier = Modifier.width(16.dp))
+
+                                                    Column {
+                                                        Text(
+                                                            text = "PROTECTION STATUS",
+                                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                                fontWeight = FontWeight.Bold,
+                                                                letterSpacing = 1.sp,
+                                                                fontSize = 9.sp
+                                                            ),
+                                                            color = if (isVpnActive) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                                        )
+
+                                                        Text(
+                                                            text = if (isVpnActive) "Active" else "Idle",
+                                                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                                                            color = if (isVpnActive) Color.White else MaterialTheme.colorScheme.onBackground
+                                                        )
+                                                    }
+                                                }
+
+                                                val vpnToggler = LocalVpnToggler.current
+                                                Switch(
+                                                    checked = isVpnActive,
+                                                    onCheckedChange = { vpnToggler(it) },
+                                                    colors = SwitchDefaults.colors(
+                                                        checkedThumbColor = Color.White,
+                                                        checkedTrackColor = AccentLight,
+                                                        uncheckedThumbColor = PrimaryBlue,
+                                                        uncheckedTrackColor = Color.LightGray.copy(alpha = 0.2f)
+                                                    ),
+                                                    modifier = Modifier.semantics { testTag = "master_firewall_toggle" }
+                                                )
+                                            }
+
+                                            // Quick Statistics nested grid (High Density styling)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                StatusCardStatBlock(
+                                                    flex = 1f,
+                                                    value = "$totalBlockedCountDb",
+                                                    label = "Blocked",
+                                                    isVpnActive = isVpnActive
+                                                )
+                                                StatusCardStatBlock(
+                                                    flex = 1.2f,
+                                                    value = "$dataSavedMB",
+                                                    label = "Saved",
+                                                    isVpnActive = isVpnActive
+                                                )
+                                                StatusCardStatBlock(
+                                                    flex = 1.1f,
+                                                    value = "$blockedRequestsCount",
+                                                    label = "Requests",
+                                                    isVpnActive = isVpnActive
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Right Column: Search + Filter chips + Virtualized list of applications
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .fillMaxHeight(),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Search Bar
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = searchQuery,
+                                            onValueChange = { viewModel.setSearchQuery(it) },
+                                            placeholder = { Text("Search system or user apps...") },
+                                            prefix = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.padding(end = 4.dp)) },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .semantics { testTag = "search_input" },
+                                            shape = RoundedCornerShape(20.dp),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = PrimaryBlue,
+                                                unfocusedBorderColor = if (isSystemInDarkTheme()) BorderDark else BorderLight,
+                                                focusedContainerColor = if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight,
+                                                unfocusedContainerColor = if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight
+                                            )
+                                        )
+
+                                        IconButton(
+                                            onClick = { viewModel.navigateTo(Screen.FilterSort) },
+                                            modifier = Modifier
+                                                .size(52.dp)
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
+                                                .border(1.dp, if (isSystemInDarkTheme()) BorderDark else BorderLight, RoundedCornerShape(20.dp))
+                                        ) {
+                                            Icon(Icons.Default.FilterList, contentDescription = "Filter and Sort settings")
+                                        }
+                                    }
+
+                                    // Filter Chips
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        FilterChipSelectionItem("All", currentFilter == FilterSelection.ALL) { viewModel.setFilter(FilterSelection.ALL) }
+                                        FilterChipSelectionItem("Blocked", currentFilter == FilterSelection.BLOCKED) { viewModel.setFilter(FilterSelection.BLOCKED) }
+                                        FilterChipSelectionItem("Allowed", currentFilter == FilterSelection.ALLOWED) { viewModel.setFilter(FilterSelection.ALLOWED) }
+                                        FilterChipSelectionItem("System Apps", currentFilter == FilterSelection.SYSTEM) { viewModel.setFilter(FilterSelection.SYSTEM) }
+                                        FilterChipSelectionItem("User Apps", currentFilter == FilterSelection.USER) { viewModel.setFilter(FilterSelection.USER) }
+                                    }
+
+                                    // Apps list text count
+                                    Text(
+                                        text = "Installed Applications (${appsList.size})",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    )
+
+                                    // Apps lists list
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        if (appsList.isEmpty()) {
+                                            Column(
+                                                modifier = Modifier.fillMaxSize(),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Info,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
+                                                    modifier = Modifier.size(64.dp)
+                                                )
+                                                Spacer(modifier = Modifier.height(10.dp))
+                                                Text(
+                                                    "No matching apps found",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                                )
+                                            }
+                                        } else {
+                                            LazyColumn(
+                                                modifier = Modifier.fillMaxSize(),
+                                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                items(appsList, key = { it.packageName }) { app ->
+                                                    AppItemViewRow(app = app, viewModel = viewModel)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Standard 1-column layout for phones/compact screens
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp)
+                            ) {
+                                // Title bar
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .statusBarsPadding()
+                                        .padding(vertical = 12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(52.dp)
-                                                .clip(CircleShape)
-                                                .background(if (isVpnActive) Color.White.copy(alpha = 0.2f) else PrimaryBlue.copy(alpha = 0.15f)),
-                                            contentAlignment = Alignment.Center
+                                    Column {
+                                        Text(
+                                            text = "NetBlock",
+                                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                        Text(
+                                            text = "V3.2 PRODUCTION",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 1.6.sp,
+                                                fontSize = 10.sp
+                                            ),
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { currentHomeTab = 2 },
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
+                                    ) {
+                                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                                    }
+                                }
+
+                                // Large Liquid Glass status card
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(28.dp))
+                                        .background(
+                                            if (isVpnActive) {
+                                                Brush.verticalGradient(listOf(PrimaryBlue, GradientMid, AccentLight))
+                                            } else {
+                                                SolidColor(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
+                                            }
+                                        )
+                                        .border(1.dp, if (isSystemInDarkTheme()) BorderDark else BorderLight, RoundedCornerShape(28.dp))
+                                        .padding(20.dp)
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(
-                                                imageVector = if (isVpnActive) Icons.Default.Shield else Icons.Default.ShieldMoon,
-                                                contentDescription = null,
-                                                tint = if (isVpnActive) Color.White else PrimaryBlue,
-                                                modifier = Modifier.size(30.dp)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(52.dp)
+                                                        .clip(CircleShape)
+                                                        .background(if (isVpnActive) Color.White.copy(alpha = 0.2f) else PrimaryBlue.copy(alpha = 0.15f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isVpnActive) Icons.Default.Shield else Icons.Default.ShieldMoon,
+                                                        contentDescription = null,
+                                                        tint = if (isVpnActive) Color.White else PrimaryBlue,
+                                                        modifier = Modifier.size(30.dp)
+                                                    )
+                                                }
+
+                                                Spacer(modifier = Modifier.width(16.dp))
+
+                                                Column {
+                                                    Text(
+                                                        text = "PROTECTION STATUS",
+                                                        style = MaterialTheme.typography.labelSmall.copy(
+                                                            fontWeight = FontWeight.Bold,
+                                                            letterSpacing = 1.sp,
+                                                            fontSize = 9.sp
+                                                        ),
+                                                        color = if (isVpnActive) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                                    )
+
+                                                    Text(
+                                                        text = if (isVpnActive) "Active" else "Idle",
+                                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                                                        color = if (isVpnActive) Color.White else MaterialTheme.colorScheme.onBackground
+                                                    )
+                                                }
+                                            }
+
+                                            val vpnToggler = LocalVpnToggler.current
+                                            Switch(
+                                                checked = isVpnActive,
+                                                onCheckedChange = { vpnToggler(it) },
+                                                colors = SwitchDefaults.colors(
+                                                    checkedThumbColor = Color.White,
+                                                    checkedTrackColor = AccentLight,
+                                                    uncheckedThumbColor = PrimaryBlue,
+                                                    uncheckedTrackColor = Color.LightGray.copy(alpha = 0.2f)
+                                                ),
+                                                modifier = Modifier.semantics { testTag = "master_firewall_toggle" }
                                             )
                                         }
 
-                                        Spacer(modifier = Modifier.width(16.dp))
-
-                                        Column {
-                                            Text(
-                                                text = "PROTECTION STATUS",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    letterSpacing = 1.sp,
-                                                    fontSize = 9.sp
-                                                ),
-                                                color = if (isVpnActive) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                        // Quick Statistics nested grid (High Density styling)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            StatusCardStatBlock(
+                                                flex = 1f,
+                                                value = "$totalBlockedCountDb",
+                                                label = "Blocked",
+                                                isVpnActive = isVpnActive
                                             )
-
-                                            Text(
-                                                text = if (isVpnActive) "Active" else "Idle",
-                                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                                                color = if (isVpnActive) Color.White else MaterialTheme.colorScheme.onBackground
+                                            StatusCardStatBlock(
+                                                flex = 1.2f,
+                                                value = "$dataSavedMB",
+                                                label = "Saved",
+                                                isVpnActive = isVpnActive
+                                            )
+                                            StatusCardStatBlock(
+                                                flex = 1.1f,
+                                                value = "$blockedRequestsCount",
+                                                label = "Requests",
+                                                isVpnActive = isVpnActive
                                             )
                                         }
                                     }
-
-                                    Switch(
-                                        checked = isVpnActive,
-                                        onCheckedChange = { viewModel.setMasterToggleState(context, it) },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = Color.White,
-                                            checkedTrackColor = AccentLight,
-                                            uncheckedThumbColor = PrimaryBlue,
-                                            uncheckedTrackColor = Color.LightGray.copy(alpha = 0.2f)
-                                        ),
-                                        modifier = Modifier.semantics { testTag = "master_firewall_toggle" }
-                                    )
                                 }
 
-                                // Quick Statistics nested grid (High Density styling)
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Search and Filter row
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    StatusCardStatBlock(
-                                        flex = 1f,
-                                        value = "$totalBlockedCountDb",
-                                        label = "Blocked",
-                                        isVpnActive = isVpnActive
+                                    OutlinedTextField(
+                                        value = searchQuery,
+                                        onValueChange = { viewModel.setSearchQuery(it) },
+                                        placeholder = { Text("Search system or user apps...") },
+                                        prefix = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.padding(end = 4.dp)) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .semantics { testTag = "search_input" },
+                                        shape = RoundedCornerShape(20.dp),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = PrimaryBlue,
+                                            unfocusedBorderColor = if (isSystemInDarkTheme()) BorderDark else BorderLight,
+                                            focusedContainerColor = if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight,
+                                            unfocusedContainerColor = if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight
+                                        )
                                     )
-                                    StatusCardStatBlock(
-                                        flex = 1.2f,
-                                        value = "$dataSavedMB",
-                                        label = "Saved",
-                                        isVpnActive = isVpnActive
-                                    )
-                                    StatusCardStatBlock(
-                                        flex = 1.1f,
-                                        value = "$blockedRequestsCount",
-                                        label = "Requests",
-                                        isVpnActive = isVpnActive
-                                    )
+
+                                    IconButton(
+                                        onClick = { viewModel.navigateTo(Screen.FilterSort) },
+                                        modifier = Modifier
+                                            .size(52.dp)
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
+                                            .border(1.dp, if (isSystemInDarkTheme()) BorderDark else BorderLight, RoundedCornerShape(20.dp))
+                                    ) {
+                                        Icon(Icons.Default.FilterList, contentDescription = "Filter and Sort settings")
+                                    }
                                 }
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
 
-                        // Search and Filter row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { viewModel.setSearchQuery(it) },
-                                placeholder = { Text("Search system or user apps...") },
-                                prefix = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.padding(end = 4.dp)) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .semantics { testTag = "search_input" },
-                                shape = RoundedCornerShape(20.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = PrimaryBlue,
-                                    unfocusedBorderColor = if (isSystemInDarkTheme()) BorderDark else BorderLight,
-                                    focusedContainerColor = if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight,
-                                    unfocusedContainerColor = if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight
+                                // Quick Horizontal scrollable chips selection
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    FilterChipSelectionItem("All", currentFilter == FilterSelection.ALL) { viewModel.setFilter(FilterSelection.ALL) }
+                                    FilterChipSelectionItem("Blocked", currentFilter == FilterSelection.BLOCKED) { viewModel.setFilter(FilterSelection.BLOCKED) }
+                                    FilterChipSelectionItem("Allowed", currentFilter == FilterSelection.ALLOWED) { viewModel.setFilter(FilterSelection.ALLOWED) }
+                                    FilterChipSelectionItem("System Apps", currentFilter == FilterSelection.SYSTEM) { viewModel.setFilter(FilterSelection.SYSTEM) }
+                                    FilterChipSelectionItem("User Apps", currentFilter == FilterSelection.USER) { viewModel.setFilter(FilterSelection.USER) }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Installed lists
+                                Text(
+                                    text = "Installed Applications (${appsList.size})",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                                    modifier = Modifier.padding(bottom = 6.dp)
                                 )
-                            )
 
-                            IconButton(
-                                onClick = { viewModel.navigateTo(Screen.FilterSort) },
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSystemInDarkTheme()) GlassCardDark else GlassCardLight)
-                                    .border(1.dp, if (isSystemInDarkTheme()) BorderDark else BorderLight, RoundedCornerShape(20.dp))
-                            ) {
-                                Icon(Icons.Default.FilterList, contentDescription = "Filter and Sort settings")
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Quick Horizontal scrollable chips selection
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilterChipSelectionItem("All", currentFilter == FilterSelection.ALL) { viewModel.setFilter(FilterSelection.ALL) }
-                            FilterChipSelectionItem("Blocked", currentFilter == FilterSelection.BLOCKED) { viewModel.setFilter(FilterSelection.BLOCKED) }
-                            FilterChipSelectionItem("Allowed", currentFilter == FilterSelection.ALLOWED) { viewModel.setFilter(FilterSelection.ALLOWED) }
-                            FilterChipSelectionItem("System Apps", currentFilter == FilterSelection.SYSTEM) { viewModel.setFilter(FilterSelection.SYSTEM) }
-                            FilterChipSelectionItem("User Apps", currentFilter == FilterSelection.USER) { viewModel.setFilter(FilterSelection.USER) }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Installed lists
-                        Text(
-                            text = "Installed Applications (${appsList.size})",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-
-                        // Apps rendering list
-                        Box(modifier = Modifier.weight(1f)) {
-                            if (appsList.isEmpty()) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.Info,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
-                                        modifier = Modifier.size(64.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Text(
-                                        "No matching apps found",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                                    )
-                                    Text(
-                                        "Try revising search queries or quick filter chips",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-                                    )
-                                }
-                            } else {
-                                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                                    appsList.forEach { app ->
-                                        AppItemViewRow(app = app, viewModel = viewModel)
-                                        Spacer(modifier = Modifier.height(10.dp))
+                                // Apps rendering list
+                                Box(modifier = Modifier.weight(1f)) {
+                                    if (appsList.isEmpty()) {
+                                        Column(
+                                            modifier = Modifier.fillMaxSize(),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Info,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
+                                                modifier = Modifier.size(64.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Text(
+                                                "No matching apps found",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                            )
+                                            Text(
+                                                "Try revising search queries or quick filter chips",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                                            )
+                                        }
+                                    } else {
+                                        LazyColumn(
+                                            modifier = Modifier.fillMaxSize(),
+                                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            items(appsList, key = { it.packageName }) { app ->
+                                                AppItemViewRow(app = app, viewModel = viewModel)
+                                            }
+                                        }
                                     }
                                 }
                             }
